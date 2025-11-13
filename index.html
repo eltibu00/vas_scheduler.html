@@ -81,9 +81,7 @@
               <input name="totalUnits" type="number" min="0" step="1" required class="w-full border rounded-lg px-2 py-1.5 text-sm" />
             </div>
             <div>
-              <label class="block text-xs font-medium text-slate-600 mb-1">
-                KPI: Units / Hour (Work Type)
-              </label>
+              <label class="block text-xs font-medium text-slate-600 mb-1">KPI: Units / Hour (Work Type)</label>
               <input name="standardRate" type="number" min="1" step="1" required class="w-full border rounded-lg px-2 py-1.5 text-sm" />
             </div>
           </div>
@@ -397,8 +395,13 @@
         setSubmitting(true);
         const res = await fetch(CONFIG.SCRIPT_URL, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'add', payload })
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8'
+          },
+          body: new URLSearchParams({
+            action: 'add',
+            payload: JSON.stringify(payload)
+          })
         });
         const json = await res.json();
         if (!json.success) {
@@ -423,6 +426,7 @@
     filterClient.addEventListener('change', applyFilters);
     filterStatus.addEventListener('change', applyFilters);
 
+    // Initial load
     fetchOrders();
   </script>
 </body>
