@@ -27,6 +27,13 @@
       </button>
     </header>
 
+    <!-- Connection Status Alert -->
+    <div id="connectionAlert" class="hidden mb-4 p-4 bg-red-50 border border-red-200 rounded-lg">
+      <p class="text-sm text-red-800">
+        <strong>Connection Error:</strong> Unable to connect to the server. Please check your Google Apps Script deployment settings.
+      </p>
+    </div>
+
     <!-- KPI Cards -->
     <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
       <div class="bg-white rounded-xl shadow-sm p-4">
@@ -205,8 +212,13 @@
     const formMessage = document.getElementById('formMessage');
     const filterClient = document.getElementById('filterClient');
     const filterStatus = document.getElementById('filterStatus');
+    const connectionAlert = document.getElementById('connectionAlert');
 
     let GLOBAL_ROWS = [];
+
+    function showConnectionError(show) {
+      connectionAlert.classList.toggle('hidden', !show);
+    }
 
     function setRefreshing(isLoading) {
       if (!refreshBtn) return;
@@ -222,20 +234,34 @@
     async function fetchOrders() {
       try {
         setRefreshing(true);
+        showConnectionError(false);
+        
         const url = CONFIG.SCRIPT_URL + '?action=list';
-        const res = await fetch(url);
+        
+        const res = await fetch(url, {
+          method: 'GET',
+          redirect: 'follow'
+        });
+        
+        if (!res.ok) {
+          throw new Error(`HTTP error! status: ${res.status}`);
+        }
+        
         const json = await res.json();
+        
         if (!json.success) {
           console.error('Error from backend', json);
+          showConnectionError(true);
           return;
         }
 
         GLOBAL_ROWS = json.data || [];
-
         populateClientFilter(GLOBAL_ROWS);
         applyFilters();
+        
       } catch (err) {
-        console.error('Fetch error', err);
+        console.error('Fetch error:', err);
+        showConnectionError(true);
       } finally {
         setRefreshing(false);
       }
@@ -376,6 +402,8 @@
     orderForm.addEventListener('submit', async (e) => {
       e.preventDefault();
       formMessage.textContent = '';
+      showConnectionError(false);
+      
       const formData = new FormData(orderForm);
 
       const payload = {
@@ -393,30 +421,41 @@
 
       try {
         setSubmitting(true);
+        
         const res = await fetch(CONFIG.SCRIPT_URL, {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8'
-          },
           body: new URLSearchParams({
             action: 'add',
             payload: JSON.stringify(payload)
-          })
+          }),
+          redirect: 'follow'
         });
+        
+        if (!res.ok) {
+          throw new Error(`HTTP error! status: ${res.status}`);
+        }
+        
         const json = await res.json();
+        
         if (!json.success) {
-          formMessage.textContent = 'Error saving job.';
+          formMessage.textContent = 'Error saving job: ' + (json.message || 'Unknown error');
           formMessage.className = 'mt-1 text-xs text-red-600';
           return;
         }
+        
         formMessage.textContent = 'Job created successfully.';
         formMessage.className = 'mt-1 text-xs text-emerald-600';
         orderForm.reset();
-        fetchOrders();
+        
+        setTimeout(() => {
+          fetchOrders();
+        }, 500);
+        
       } catch (err) {
-        console.error(err);
-        formMessage.textContent = 'Network or server error.';
+        console.error('Submit error:', err);
+        formMessage.textContent = 'Network or server error. Check console for details.';
         formMessage.className = 'mt-1 text-xs text-red-600';
+        showConnectionError(true);
       } finally {
         setSubmitting(false);
       }
